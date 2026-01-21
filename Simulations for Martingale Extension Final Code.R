@@ -1,3 +1,55 @@
+# MC based proof of concept for extension to the asymptotic distribution 
+#     of group-sequentially computed logrank statistic for non-contiguous
+#     alternatives utilizing staggered uniform entry,exponential survival, 
+#     administrative censoring, under equal random allocation to 
+#     treatment/control arm, under the assumption of proportional hazards.
+
+################################################################################
+# Required packages
+################################################################################
+
+library(parallel)
+library(pbmcapply)
+library(pbapply)
+library(ggplot2)
+library(KMsurv)
+library(survival)
+library(rpact)
+library(mvtnorm)
+library(rootSolve)
+library(lpSolve)
+library(lpSolveAPI)
+library(splines)
+library(mgcv)
+library(beepr)
+library(cubature)
+
+################################################################################
+# Initial Values
+################################################################################
+
+n = 200
+t = c(1.5,2,2.5,3)
+K = length(t)
+ta = 2
+
+method = "Weibull"
+haz_ct = 1.5
+lam = haz_ct
+par = c(haz_ct,1)
+
+# Log-Hazard Ratio
+theta = -0.9
+
+# Probability of allocation to the treatment arm
+p = 1/2
+
+################################################################################
+################################################################################
+################################################################################
+################################################################################
+################################################################################
+
 ################################################################################
 # Functions to compute the asymptotic means, variances, and covariances
 ################################################################################
@@ -248,59 +300,6 @@ d_t1_t2_asymp_cov = function(tt1,tt2)
 #     group-sequentially logrank statistic
 
 ################################################################################
-# Required packages
-################################################################################
-
-library(parallel)
-library(pbmcapply)
-library(pbapply)
-library(ggplot2)
-library(KMsurv)
-library(survival)
-library(rpact)
-library(mvtnorm)
-library(rootSolve)
-library(lpSolve)
-library(lpSolveAPI)
-library(plot3D)
-library(plot3Drgl)
-library(splines)
-library(mgcv)
-library(beepr)
-library(cubature)
-
-################################################################################
-# Initial Values
-################################################################################
-
-n = 300
-t = c(1.5,2,2.5,3)
-K = length(t)
-ta = 2
-
-method = "Weibull"
-haz_ct = 1.5
-lam = haz_ct
-par = c(haz_ct,1)
-
-# Log-Hazard Ratio
-theta = -0.8
-
-# Probability of allocation to the treatment arm
-p = 1/2
-
-# Vector to store the asymptotic variances under the null
-sig2s_0 = numeric(K)
-# Variance of the RV Z which is the treatment indicator
-sig2z = p*(1-p)
-
-# Minimum of the t_k and t_a; required in the computation of the asymptotic
-#     variances
-t.ta.min = apply(cbind(t,rep(ta,K)),1,min)
-# sig2s - vector of true asymptotic variances under the null
-sig2s_0 = sig2z * (1/ta) * (t.ta.min - exp(-lam*t)*((exp(t.ta.min*lam)-1)/lam))
-
-################################################################################
 # Function to simulate the data
 ################################################################################
 
@@ -433,7 +432,7 @@ apply(cbind(t),1,function(tt){d_t_asymp_mean(tt)})
 apply(init_d_mat,2,function(vec){var(vec/sqrt(n))})
 apply(cbind(t),1,function(tt){d_t_asymp_var(tt)})
 
-cov(-init_d_mat[,1]/sqrt(n),-init_d_mat[,2]/sqrt(n))
+cov(init_d_mat[,1]/sqrt(n),init_d_mat[,2]/sqrt(n))
 d_t1_t2_asymp_cov(1.5,2)
 cov(-init_d_mat[,1]/sqrt(n),-init_d_mat[,3]/sqrt(n))
 d_t1_t2_asymp_cov(1.5,2.5)
