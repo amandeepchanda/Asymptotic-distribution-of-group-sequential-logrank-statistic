@@ -9,37 +9,37 @@
 ################################################################################
 
 library(parallel)
-library(pbmcapply)
-library(pbapply)
-library(ggplot2)
+library(tidyverse)
+library(patchwork)
 library(KMsurv)
 library(survival)
-library(rpact)
 library(mvtnorm)
-library(rootSolve)
-library(lpSolve)
-library(lpSolveAPI)
-library(splines)
-library(mgcv)
 library(beepr)
-library(cubature)
 
 ################################################################################
 # Initial Values
 ################################################################################
 
-n = 200
+# Number of patients in the trial
+n = 300
+# Calendar times of analysis; the last time of analysis also specifies the 
+#     end of the trial.
 t = c(1.5,2,2.5,3)
+# Total number of analyses
 K = length(t)
+# Calendar time of end of accrual 
 ta = 2
 
+# Distribution of the time to failure variable; here we assume exponentially
+#     distributed survival 
 method = "Weibull"
-haz_ct = 1.5
+# Hazard rate for the control arm 
+haz_ct = 1
 lam = haz_ct
 par = c(haz_ct,1)
 
 # Log-Hazard Ratio
-theta = -0.9
+theta = -0.1
 
 # Probability of allocation to the treatment arm
 p = 1/2
@@ -54,10 +54,10 @@ p = 1/2
 # Functions to compute the asymptotic means, variances, and covariances
 ################################################################################
 
-# Baseline Hazard
+# Hazard rate for the control arm
 # This can be made a function to deal with distributions other than Exp
 lam0 = lam
-# Treatment Hazard
+# Hazard rate for the treatment arm
 lam1 = lam0 * exp(theta)
 
 # E(Z|Y(x))
@@ -272,6 +272,10 @@ d_cross_cov = function(tt1,tt2)
 
 ################################################################################
 
+# These function compute the asymptotic mean, variance, and covariance 
+#     expressions at fixed calendar times.
+# To compute the expressions at multiple calendar times we can use apply(...).
+
 # E(D(t))
 d_t_asymp_mean = function(tt)
 {
@@ -399,7 +403,7 @@ raw_data_list = mclapply(seq_len(B),
                            AA1 = f_surv_data(n,t,ta,method="Weibull",par,theta)
                            colnames(AA1) = c("X","D","Z")
                            AA1
-                         }, mc.cores=8)
+                         }, mc.cores=13)
 proc.time() - tt
 beepr::beep(sound = 2)
 
@@ -420,18 +424,53 @@ init_d_list = mclapply(seq_len(B),
                          
                          LR_stats
                          
-                       },mc.cores=10)
+                       },mc.cores=13)
 proc.time() - tt
 beepr::beep(sound = 2)
 
 init_d_mat = do.call(rbind, init_d_list)
 
+rm(raw_data_list)
+rm(init_d_list)
+
+################################################################################
+################################################################################
+
+# Expressions for the means and variances assuming contiguous alternatives.
+
+# Variance expressions are obtained using expressions provided in Tsiatis 1981
+
+# Variance of treatment covariate Z
+sig2z = p*(1-p)
+# Minimum of calendar times of analysis and end of accrual
+t.ta.min = pmin(c(t),ta)
+# Asymptotic variances at calendar times of analysis
+sig2s = sig2z * ( (1-p) * (1/ta) * 
+                    (t.ta.min - exp(-lam0*t)*((exp(t.ta.min*lam0)-1)/lam0)) +
+                    (p) * (1/ta) * 
+                    (t.ta.min - exp(-lam1*t)*((exp(t.ta.min*lam1)-1)/lam1)))
+
+# Mean vector
+mean_vec = sqrt(n) * theta * sig2s
+
+################################################################################
+################################################################################
+
+# Comparing means, and variances based on MC averages, asymptotic expressions
+#     assuming contiguous alternatives, and asymptotic expressions for more
+#     general alternatives
+
+# Comparison of asymptotic mean vector
 apply(init_d_mat,2,function(vec){mean(vec/sqrt(n))})
 apply(cbind(t),1,function(tt){d_t_asymp_mean(tt)})
+mean_vec
 
+# Comparison of asymptotic variance
 apply(init_d_mat,2,function(vec){var(vec/sqrt(n))})
 apply(cbind(t),1,function(tt){d_t_asymp_var(tt)})
+sig2s
 
+# Comparison of covariance terms
 cov(init_d_mat[,1]/sqrt(n),init_d_mat[,2]/sqrt(n))
 d_t1_t2_asymp_cov(1.5,2)
 cov(-init_d_mat[,1]/sqrt(n),-init_d_mat[,3]/sqrt(n))
@@ -441,6 +480,8 @@ d_t1_t2_asymp_cov(1.5,3)
 
 ################################################################################
 ################################################################################
+
+# Plots using base R
 
 par(mfrow=c(1,3))
 
@@ -469,3 +510,62 @@ curve(dnorm(x,mean=d_t_asymp_mean(1.5)+d_t_asymp_mean(2),
 ################################################################################
 ################################################################################
 
+# Plots using ggplot
+
+p1 = ggplot(data.frame(x = (init_d_mat[, 1] * (1 / sqrt(n)))), 
+            aes(x = (init_d_mat[, 1] * (1 / sqrt(n))) )) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 21,
+                 color = "black",
+                 fill = "grey",
+                 na.rm = TRUE) +
+  geom_density(linewidth = 1.0, na.rm = TRUE) +
+  stat_function(fun = dnorm,
+                args = list(mean = d_t_asymp_mean(1.5), 
+                            sd = sqrt(d_t_asymp_var(1.5))),
+                color = "red",
+                linewidth = 1.0,
+                linetype = "dashed") +
+  labs(title = "D(t=1.5)/sqrt(n)",
+       x = "",
+       y = "Density") +
+  theme_bw()
+
+p2 = ggplot(data.frame(x = (init_d_mat[, 2] * (1 / sqrt(n)))), 
+            aes(x = (init_d_mat[, 2] * (1 / sqrt(n))) )) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 21,
+                 color = "black",
+                 fill = "grey",
+                 na.rm = TRUE) +
+  geom_density(linewidth = 1.0, na.rm = TRUE) +
+  stat_function(fun = dnorm,
+                args = list(mean = d_t_asymp_mean(2), 
+                            sd = sqrt(d_t_asymp_var(2))),
+                color = "red",
+                linewidth = 1.0,
+                linetype = "dashed") +
+  labs(title = "D(t=2)/sqrt(n)",
+       x = "",
+       y = "Density") +
+  theme_bw()
+
+p3 = ggplot(data.frame(x = (init_d_mat[,1]+init_d_mat[,2])*(1/sqrt(n))), 
+            aes(x = (init_d_mat[,1]+init_d_mat[,2])*(1/sqrt(n)))) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 21,
+                 color = "black",
+                 fill = "grey",
+                 na.rm = TRUE) +
+  geom_density(linewidth = 1.0, na.rm = TRUE) +
+  stat_function(fun = dnorm,
+                args = list(mean = (d_t_asymp_mean(1.5)+d_t_asymp_mean(2)), 
+                            sd = sqrt(d_t_asymp_var(1.5)+d_t_asymp_var(2)+
+                                      2*d_t1_t2_asymp_cov(1.5,2))),
+                color = "red",
+                linewidth = 1.0,
+                linetype = "dashed") +
+  labs(title = "(D(t=1.5)+D(t=2))/sqrt(n)", x = "", y = "Density") +
+  theme_bw()
+
+p1+p2+p3
