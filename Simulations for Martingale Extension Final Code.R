@@ -460,10 +460,13 @@ mean_vec = sqrt(n) * theta * sig2s
 #     assuming contiguous alternatives, and asymptotic expressions for more
 #     general alternatives
 
-# Comparison of asymptotic mean vector
+# Comparison of mean vector
 
+# Empirical Mean
 apply(init_d_mat,2,function(vec){mean(vec/sqrt(n))})
+# Mean assuming general theta
 apply(cbind(t),1,function(tt){d_t_asymp_mean(tt)})
+# Mean assuming contiguous theta
 mean_vec
 
 # Comparison of maximum absolute error for the two mean approximations from the 
@@ -474,10 +477,13 @@ max(abs(apply(init_d_mat,2,function(vec){mean(vec/sqrt(n))}) -
 # Existing approximation
 max(abs(apply(init_d_mat,2,function(vec){mean(vec/sqrt(n))}) - mean_vec ))
 
-# Comparison of asymptotic variance
+# Comparison of variances
 
+# Empirical variances
 apply(init_d_mat,2,function(vec){var(vec/sqrt(n))})
+# Variances assuming general theta 
 apply(cbind(t),1,function(tt){d_t_asymp_var(tt)})
+# Variances assuming contiguous
 sig2s
 
 # Comparison of maximum absolute error for the two variance approximations from 
