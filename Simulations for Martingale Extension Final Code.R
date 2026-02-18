@@ -39,7 +39,7 @@ lam = haz_ct
 par = c(haz_ct,1)
 
 # Log-Hazard Ratio
-theta = -0.1
+theta = -1.5
 
 # Probability of allocation to the treatment arm
 p = 1/2
@@ -461,22 +461,62 @@ mean_vec = sqrt(n) * theta * sig2s
 #     general alternatives
 
 # Comparison of asymptotic mean vector
+
 apply(init_d_mat,2,function(vec){mean(vec/sqrt(n))})
 apply(cbind(t),1,function(tt){d_t_asymp_mean(tt)})
 mean_vec
 
+# Comparison of maximum absolute error for the two mean approximations from the 
+#     empirical mean
+# Proposed Approximation
+max(abs(apply(init_d_mat,2,function(vec){mean(vec/sqrt(n))}) -
+          apply(cbind(t),1,function(tt){d_t_asymp_mean(tt)}) ))
+# Existing approximation
+max(abs(apply(init_d_mat,2,function(vec){mean(vec/sqrt(n))}) - mean_vec ))
+
 # Comparison of asymptotic variance
+
 apply(init_d_mat,2,function(vec){var(vec/sqrt(n))})
 apply(cbind(t),1,function(tt){d_t_asymp_var(tt)})
 sig2s
 
-# Comparison of covariance terms
-cov(init_d_mat[,1]/sqrt(n),init_d_mat[,2]/sqrt(n))
-d_t1_t2_asymp_cov(1.5,2)
-cov(-init_d_mat[,1]/sqrt(n),-init_d_mat[,3]/sqrt(n))
-d_t1_t2_asymp_cov(1.5,2.5)
-cov(-init_d_mat[,1]/sqrt(n),-init_d_mat[,4]/sqrt(n))
-d_t1_t2_asymp_cov(1.5,3)
+# Comparison of maximum absolute error for the two variance approximations from 
+#     the empirical variance
+# Proposed Approximation
+max(abs(apply(init_d_mat,2,function(vec){var(vec/sqrt(n))}) -
+          apply(cbind(t),1,function(tt){d_t_asymp_var(tt)}) ))
+# Existing Approximation
+max(abs(apply(init_d_mat,2,function(vec){var(vec/sqrt(n))}) - sig2s ))
+
+# Covariance matrix obtained using asymptotic expressions for general theta
+general_var_vec = c(apply(cbind(t),1,function(tt){d_t_asymp_var(tt)}))
+general_cov_mat = diag(c(general_var_vec))
+general_upper_cov_mat_ind = which(upper.tri(general_cov_mat),arr.ind = TRUE)
+general_cov_vec = apply(general_upper_cov_mat_ind,1,
+                function(ind){d_t1_t2_asymp_cov(tt1=t[ind[1]],tt2=t[ind[2]])})
+general_cov_mat[upper.tri(general_cov_mat)] = general_cov_vec
+general_cov_mat[lower.tri(general_cov_mat)] = (t(general_cov_mat))[lower.tri(general_cov_mat)]
+
+# Covariance matrix obtained using asymptotic expressions for contiguous theta
+contig_var_vec = sig2s
+contig_cov_mat = diag(contig_var_vec)
+contig_cov_mat[lower.tri(contig_cov_mat)] = sig2s[rep(c(1:(K-1)),times=c((K-1):1))]
+contig_cov_mat[upper.tri(contig_cov_mat)] = (t(contig_cov_mat))[upper.tri(contig_cov_mat)]
+
+# Empirical Covariance Matrix
+emp_var_vec = apply(init_d_mat,2,function(vec){var(vec/sqrt(n))})
+emp_cov_mat = diag(emp_var_vec)
+emp_upper_cov_mat_ind = which(upper.tri(emp_cov_mat),arr.ind = TRUE)
+emp_cov_vec = apply(emp_upper_cov_mat_ind,1,
+                    function(ind){cov(init_d_mat[,ind[1]]/sqrt(n),init_d_mat[,ind[2]]/sqrt(n))})
+emp_cov_mat[upper.tri(emp_cov_mat)] = emp_cov_vec
+emp_cov_mat[lower.tri(emp_cov_mat)] = (t(emp_cov_mat))[lower.tri(emp_cov_mat)]
+
+# Maximum Absolute Entry-wise Error for (General - Empirical) covariance matrix
+max(general_cov_mat - emp_cov_mat)
+
+# Maximum Absolute Entry-wise Error for (Contiguous - Empirical) covariance matrix
+max(contig_cov_mat - emp_cov_mat)
 
 ################################################################################
 ################################################################################
